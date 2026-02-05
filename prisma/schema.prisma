@@ -1,0 +1,277 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum AttendanceStatus {
+  OFFICE       // В офисе
+  REMOTE       // Из дома
+  SICK         // Больничный
+  VACATION     // Отпуск
+  DAYOFF       // Отгул
+  WEEKEND      // Выходной
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RecurrenceType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum VacationStatus {
+  PENDING      // Ожидает рассмотрения
+  APPROVED     // Одобрено
+  REJECTED     // Отклонено
+  CANCELLED    // Отменено
+}
+
+enum ApprovalLevel {
+  MANAGER      // Руководитель
+  HR           // HR
+  DIRECTOR     // Директор
+}
+
+enum CommentType {
+  NORMAL       // Обычный
+  IMPORTANT    // Важный
+  CRITICAL     // Критичный
+  INFO         // Информационный
+}
+
+model User {
+  id                String              @id @default(cuid())
+  email             String              @unique
+  password          String
+  role              Role                @default(USER)
+  name              String
+  phone             String?
+  position          String?
+  skills            String?             // Профиль знаний
+  avatar            String?             // Путь к файлу аватарки
+  vacationDays      Int                 @default(28) // Доступные дни отпуска в году
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  attendances       Attendance[]
+  changeRequests    AttendanceRequest[]
+  recurringPatterns RecurringPattern[]
+  vacationRequests  VacationRequest[]
+  vacationApprovals VacationApproval[]
+  sickLeaves        SickLeave[]
+  workTimes         WorkTime[]
+  overtimeWorks     OvertimeWork[]
+  dayComments       DayComment[]
+  swapRequestsInitiated ScheduleSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived  ScheduleSwapRequest[] @relation("SwapTarget")
+  swapRequestsReviewed  ScheduleSwapRequest[] @relation("SwapAdminReviewer")
+  
+  @@map("users")
+}
+
+model Attendance {
+  id        String            @id @default(cuid())
+  userId    String
+  date      DateTime          // Дата присутствия
+  status    AttendanceStatus
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([date])
+  @@map("attendances")
+}
+
+model AttendanceRequest {
+  id          String         @id @default(cuid())
+  userId      String
+  date        DateTime       // Дата, на которую запрос
+  newStatus   AttendanceStatus
+  reason      String         // Причина запроса
+  status      RequestStatus  @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([status])
+  @@map("attendance_requests")
+}
+
+model RecurringPattern {
+  id            String            @id @default(cuid())
+  userId        String
+  status        AttendanceStatus
+  recurrenceType RecurrenceType
+  dayOfWeek     Int?              // 1-7 (понедельник-воскресенье) для WEEKLY
+  dayOfMonth    Int?              // 1-31 для MONTHLY
+  isActive      Boolean           @default(true)
+  startDate     DateTime?         // Необязательно: начало действия правила
+  endDate       DateTime?         // Необязательно: конец действия правила
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("recurring_patterns")
+}
+
+model VacationRequest {
+  id            String              @id @default(cuid())
+  userId        String
+  startDate     DateTime            // Начало отпуска
+  endDate       DateTime            // Конец отпуска
+  days          Int                 // Количество дней
+  reason        String?             // Причина (опционально)
+  status        VacationStatus      @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approvals     VacationApproval[]
+  
+  @@index([userId])
+  @@index([status])
+  @@map("vacation_requests")
+}
+
+model VacationApproval {
+  id                String            @id @default(cuid())
+  vacationRequestId String
+  approverId        String
+  level             ApprovalLevel
+  status            VacationStatus    // APPROVED или REJECTED
+  comment           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  vacationRequest   VacationRequest   @relation(fields: [vacationRequestId], references: [id], onDelete: Cascade)
+  approver          User              @relation(fields: [approverId], references: [id], onDelete: Cascade)
+  
+  @@unique([vacationRequestId, level])
+  @@map("vacation_approvals")
+}
+
+model SickLeave {
+  id            String      @id @default(cuid())
+  userId        String
+  startDate     DateTime    // Начало больничного
+  endDate       DateTime    // Конец больничного
+  days          Int         // Количество дней
+  diagnosis     String?     // Диагноз (опционально)
+  documentPath  String?     // Путь к скану больничного листа
+  notes         String?     // Дополнительные заметки
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([startDate])
+  @@map("sick_leaves")
+}
+
+model WorkTime {
+  id          String      @id @default(cuid())
+  userId      String
+  date        DateTime    // Дата
+  checkIn     DateTime?   // Время прихода
+  checkOut    DateTime?   // Время ухода
+  totalHours  Float       @default(0) // Всего часов
+  overtime    Float       @default(0) // Сверхурочные часы
+  notes       String?     // Примечания
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("work_times")
+}
+
+model OvertimeWork {
+  id            String      @id @default(cuid())
+  userId        String
+  date          DateTime    // Дата (день когда работали)
+  startTime     DateTime    // Точное время начала переработки
+  endTime       DateTime?   // Точное время окончания
+  duration      Float       @default(0) // Длительность в часах
+  description   String      // Описание выполненных работ
+  isConfirmed   Boolean     @default(false) // Подтверждено руководителем
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([date])
+  @@index([isConfirmed])
+  @@map("overtime_works")
+}
+
+model DayComment {
+  id            String      @id @default(cuid())
+  date          DateTime    // Дата дня, к которому относится комментарий
+  userId        String      // Автор комментария
+  text          String      @db.Text // Текст комментария
+  type          CommentType @default(NORMAL) // Тип комментария (обычный, важный, критичный)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([date])
+  @@index([userId])
+  @@index([type])
+  @@map("day_comments")
+}
+
+// Запросы на обмен графиками
+model ScheduleSwapRequest {
+  id                String        @id @default(cuid())
+  requesterId       String        // Кто инициирует обмен
+  targetUserId      String        // С кем хочет поменяться
+  date              DateTime      // Дата обмена
+  requesterOldStatus AttendanceStatus // Текущий статус инициатора
+  requesterNewStatus AttendanceStatus // Желаемый статус инициатора
+  targetOldStatus   AttendanceStatus // Текущий статус партнера
+  targetNewStatus   AttendanceStatus // Желаемый статус партнера
+  reason            String?       // Причина обмена
+  status            RequestStatus @default(PENDING)
+  targetApproved    Boolean       @default(false) // Согласие второго сотрудника
+  adminReviewedBy   String?       // Кто из админов рассмотрел
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  requester         User          @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  targetUser        User          @relation("SwapTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  adminReviewer     User?         @relation("SwapAdminReviewer", fields: [adminReviewedBy], references: [id], onDelete: SetNull)
+  
+  @@index([requesterId])
+  @@index([targetUserId])
+  @@index([date])
+  @@index([status])
+  @@map("schedule_swap_requests")
+}
+

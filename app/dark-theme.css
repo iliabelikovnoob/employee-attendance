@@ -1,0 +1,72 @@
+/* Дополнительные стили для темной темы */
+
+/* Календарь */
+.dark .calendar-header {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .calendar-cell {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .calendar-cell:hover {
+  @apply bg-gray-750;
+}
+
+/* Карточки */
+.dark .card {
+  @apply bg-gray-800 border-gray-700;
+}
+
+.dark .card-header {
+  @apply bg-gray-750 border-gray-700;
+}
+
+/* Таблицы */
+.dark table thead {
+  @apply bg-gray-800;
+}
+
+.dark table tbody tr {
+  @apply bg-gray-900 border-gray-800;
+}
+
+.dark table tbody tr:hover {
+  @apply bg-gray-800;
+}
+
+/* Модальные окна */
+.dark .modal-overlay {
+  @apply bg-gray-900/80;
+}
+
+.dark .modal-content {
+  @apply bg-gray-800 border-gray-700;
+}
+
+/* Инпуты */
+.dark input,
+.dark textarea,
+.dark select {
+  @apply bg-gray-900 border-gray-700 text-gray-100;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  @apply border-blue-500 ring-blue-500;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  @apply text-gray-500;
+}
+
+/* Кнопки */
+.dark button:not(.btn-primary):not(.btn-danger) {
+  @apply bg-gray-800 text-gray-100 border-gray-700;
+}
+
+.dark button:not(.btn-primary):not(.btn-danger):hover {
+  @apply bg-gray-700;
+}
