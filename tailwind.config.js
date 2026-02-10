@@ -14,6 +14,7 @@ module.exports = {
         'sick': '#ef4444',
         'vacation': '#3b82f6',
         'dayoff': '#6b7280',
+        'weekend': '#8b5cf6',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-in-out',

@@ -123,29 +123,35 @@ export default function Header({ user }: HeaderProps) {
               Календарь
             </Link>
 
-            {/* Отсутствия */}
+            {/* Команда */}
             <div className="relative">
               <button
-                onClick={() => toggleDropdown('absences')}
+                onClick={() => toggleDropdown('team')}
                 className={clsx(
-                  'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors',
-                  isActiveInDropdown(['/vacations', '/sick-leaves']) || openDropdown === 'absences'
+                  'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors relative',
+                  isActiveInDropdown(['/employees', '/requests', '/recurring', '/vacations', '/sick-leaves']) || openDropdown === 'team'
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                    : 'text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <IoAirplane className="w-5 h-5" />
-                Отсутствия
-                <IoChevronDown className={clsx('w-4 h-4 transition-transform', openDropdown === 'absences' && 'rotate-180')} />
+                <IoPeople className="w-5 h-5" />
+                Команда
+                <IoChevronDown className={clsx('w-4 h-4 transition-transform', openDropdown === 'team' && 'rotate-180')} />
+                {pendingCount > 0 && user.role === 'ADMIN' && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
 
-              {openDropdown === 'absences' && (
-                <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 dark:border-gray-700 py-1 z-50">
+              {openDropdown === 'team' && (
+                <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
+                  {/* Отсутствия */}
                   <Link
                     href="/vacations"
                     onClick={closeDropdown}
                     className={clsx(
-                      'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                      'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
                       pathname === '/vacations' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
                     )}
                   >
@@ -157,85 +163,64 @@ export default function Header({ user }: HeaderProps) {
                     href="/sick-leaves"
                     onClick={closeDropdown}
                     className={clsx(
-                      'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                      'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
                       pathname === '/sick-leaves' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
                     )}
                   >
                     <IoMedkit className="w-5 h-5" />
                     <span>{user.role === 'ADMIN' ? 'Больничные' : 'Мои больничные'}</span>
                   </Link>
+
+                  {/* Раздел только для админа */}
+                  {user.role === 'ADMIN' && (
+                    <>
+                      <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+
+                      <Link
+                        href="/employees"
+                        onClick={closeDropdown}
+                        className={clsx(
+                          'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                          pathname === '/employees' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                        )}
+                      >
+                        <IoPeople className="w-5 h-5" />
+                        <span>Сотрудники</span>
+                      </Link>
+
+                      <Link
+                        href="/requests"
+                        onClick={closeDropdown}
+                        className={clsx(
+                          'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors relative',
+                          pathname === '/requests' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                        )}
+                      >
+                        <IoDocumentText className="w-5 h-5" />
+                        <span>Запросы</span>
+                        {pendingCount > 0 && (
+                          <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {pendingCount}
+                          </span>
+                        )}
+                      </Link>
+
+                      <Link
+                        href="/recurring"
+                        onClick={closeDropdown}
+                        className={clsx(
+                          'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                          pathname === '/recurring' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                        )}
+                      >
+                        <IoSync className="w-5 h-5" />
+                        <span>Правила</span>
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
             </div>
-
-            {/* Команда (только для админа) */}
-            {user.role === 'ADMIN' && (
-              <div className="relative">
-                <button
-                  onClick={() => toggleDropdown('team')}
-                  className={clsx(
-                    'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors relative',
-                    isActiveInDropdown(['/employees', '/requests', '/recurring']) || openDropdown === 'team'
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                      : 'text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  )}
-                >
-                  <IoPeople className="w-5 h-5" />
-                  Команда
-                  <IoChevronDown className={clsx('w-4 h-4 transition-transform', openDropdown === 'team' && 'rotate-180')} />
-                  {pendingCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {pendingCount}
-                    </span>
-                  )}
-                </button>
-
-                {openDropdown === 'team' && (
-                  <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 dark:border-gray-700 py-1 z-50">
-                    <Link
-                      href="/employees"
-                      onClick={closeDropdown}
-                      className={clsx(
-                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
-                        pathname === '/employees' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
-                      )}
-                    >
-                      <IoPeople className="w-5 h-5" />
-                      <span>Сотрудники</span>
-                    </Link>
-
-                    <Link
-                      href="/requests"
-                      onClick={closeDropdown}
-                      className={clsx(
-                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors relative',
-                        pathname === '/requests' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
-                      )}
-                    >
-                      <IoDocumentText className="w-5 h-5" />
-                      <span>Запросы</span>
-                      {pendingCount > 0 && (
-                        <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                          {pendingCount}
-                        </span>
-                      )}
-                    </Link>
-
-                    <Link
-                      href="/recurring"
-                      onClick={closeDropdown}
-                      className={clsx(
-                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
-                        pathname === '/recurring' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
-                      )}
-                    >
-                      <IoSync className="w-5 h-5" />
-                      <span>Правила</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Аналитика */}
             {user.role === 'ADMIN' ? (

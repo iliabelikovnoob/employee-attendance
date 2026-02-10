@@ -8,8 +8,10 @@ import BulkUpdateModal from '@/components/modals/BulkUpdateModal';
 import SwapRequestsModal from '@/components/modals/SwapRequestsModal';
 import { User, Attendance } from '@/types';
 import { dateToString } from '@/lib/calendar';
-import Button from '@/components/ui/Button';
-import { IoCalendarOutline, IoTrashBin, IoEllipsisHorizontal, IoSync, IoSwapHorizontal } from 'react-icons/io5';
+import PresenceWidget from '@/components/presence/PresenceWidget';
+import { IoCalendarOutline, IoTrashBin, IoEllipsisHorizontal, IoSwapHorizontal, IoCopy } from 'react-icons/io5';
+import CopyScheduleModal from '@/components/modals/CopyScheduleModal';
+import ClearDatesModal from '@/components/modals/ClearDatesModal';
 import { toast } from 'react-hot-toast';
 
 export default function HomePage() {
@@ -28,6 +30,8 @@ export default function HomePage() {
   const [showSwapRequestsModal, setShowSwapRequestsModal] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showClearDatesModal, setShowClearDatesModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -135,29 +139,32 @@ export default function HomePage() {
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300 dark:text-gray-300">Загрузка...</p>
+          <p className="text-gray-600 dark:text-gray-300">Загрузка...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Фильтры с кнопкой действий */}
+    <div className="space-y-3">
+      {/* Виджет присутствия — самый верх */}
+      <PresenceWidget />
+
+      {/* Календарь с фильтрами в шапке */}
       <CalendarFilters
         users={allUsers}
         onFilterChange={setFilters}
         actionsButton={
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {/* Кнопка "Запросы" для обычных пользователей */}
             {session?.user?.role !== 'ADMIN' && (
-              <Button
+              <button
                 onClick={() => setShowSwapRequestsModal(true)}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
               >
-                <IoSwapHorizontal className="w-5 h-5" />
+                <IoSwapHorizontal className="w-4 h-4" />
                 <span className="hidden sm:inline">Запросы</span>
-              </Button>
+              </button>
             )}
 
             {/* Кнопка "Ещё" для админа */}
@@ -165,15 +172,15 @@ export default function HomePage() {
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowActionsMenu(!showActionsMenu)}
-                  className="px-4 py-2.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm"
+                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
                 >
-                  <IoEllipsisHorizontal className="w-5 h-5" />
+                  <IoEllipsisHorizontal className="w-4 h-4" />
                   <span className="hidden sm:inline">Ещё</span>
                 </button>
 
                 {/* Dropdown Menu */}
                 {showActionsMenu && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-10 animate-fade-in">
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-20 animate-fade-in">
                     <button
                       onClick={() => {
                         setShowActionsMenu(false);
@@ -185,7 +192,29 @@ export default function HomePage() {
                       <span className="text-gray-900 dark:text-white">Групповое изменение</span>
                     </button>
 
+                    <button
+                      onClick={() => {
+                        setShowActionsMenu(false);
+                        setShowCopyModal(true);
+                      }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                    >
+                      <IoCopy className="w-5 h-5 text-indigo-600" />
+                      <span className="text-gray-900 dark:text-white">Повторить расписание</span>
+                    </button>
+
                     <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+
+                    <button
+                      onClick={() => {
+                        setShowActionsMenu(false);
+                        setShowClearDatesModal(true);
+                      }}
+                      className="w-full px-4 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+                    >
+                      <IoTrashBin className="w-5 h-5 text-red-600" />
+                      <span className="text-gray-900 dark:text-white">Очистить даты</span>
+                    </button>
 
                     <button
                       onClick={() => {
@@ -216,15 +245,20 @@ export default function HomePage() {
             )}
           </div>
         }
-      />
-
-      {/* Календарь */}
-      <Calendar
-        users={users}
-        attendances={filteredAttendances}
-        onRefresh={fetchData}
-        isAdmin={session?.user?.role === 'ADMIN'}
-      />
+      >
+        {({ toolbar, filterPanel }) => (
+          <Calendar
+            users={users}
+            attendances={filteredAttendances}
+            onRefresh={fetchData}
+            isAdmin={session?.user?.role === 'ADMIN'}
+            toolbar={toolbar}
+            filterPanel={filterPanel}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+          />
+        )}
+      </CalendarFilters>
 
       {/* Модалка группового изменения */}
       {showBulkModal && (
@@ -245,6 +279,32 @@ export default function HomePage() {
           isOpen={showSwapRequestsModal}
           onClose={() => setShowSwapRequestsModal(false)}
           currentUserId={session?.user?.id || ''}
+        />
+      )}
+
+      {/* Модалка очистки дат */}
+      {showClearDatesModal && (
+        <ClearDatesModal
+          isOpen={showClearDatesModal}
+          onClose={() => setShowClearDatesModal(false)}
+          onSuccess={() => {
+            setShowClearDatesModal(false);
+            fetchData();
+          }}
+          currentDate={currentDate}
+        />
+      )}
+
+      {/* Модалка копирования расписания */}
+      {showCopyModal && (
+        <CopyScheduleModal
+          isOpen={showCopyModal}
+          onClose={() => setShowCopyModal(false)}
+          onSuccess={() => {
+            setShowCopyModal(false);
+            fetchData();
+          }}
+          currentDate={currentDate}
         />
       )}
     </div>

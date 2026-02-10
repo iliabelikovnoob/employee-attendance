@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getMonthDays, formatDate, addMonths, subMonths, isCurrentMonth, isToday, dateToString } from '@/lib/calendar';
 import { getWeekDays } from '@/lib/calendar';
-import { IoChevronBack, IoChevronForward } from 'react-icons/io5';
+import { IoChevronBack, IoChevronForward, IoChevronDown, IoChevronUp } from 'react-icons/io5';
 import { Attendance, User } from '@/types';
 import DayCell from './DayCell';
 import DayDetailsModalEnhanced from '../modals/DayDetailsModalEnhanced';
@@ -14,18 +14,23 @@ interface CalendarProps {
   attendances: Attendance[];
   onRefresh: () => void;
   isAdmin: boolean;
+  toolbar?: React.ReactNode;
+  filterPanel?: React.ReactNode;
+  currentDate?: Date;
+  onDateChange?: (date: Date) => void;
 }
 
-export default function Calendar({ users, attendances, onRefresh, isAdmin }: CalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+export default function Calendar({ users, attendances, onRefresh, isAdmin, toolbar, filterPanel, currentDate: externalDate, onDateChange }: CalendarProps) {
+  const [internalDate, setInternalDate] = useState(externalDate || new Date());
+  const currentDate = externalDate || internalDate;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [collapsed, setCollapsed] = useState(false);
 
   const days = getMonthDays(currentDate);
   const weekDays = getWeekDays();
 
-  // Группируем посещаемость по дате
   const attendanceByDate = attendances.reduce((acc, attendance) => {
     const dateKey = dateToString(new Date(attendance.date));
     if (!acc[dateKey]) {
@@ -35,7 +40,6 @@ export default function Calendar({ users, attendances, onRefresh, isAdmin }: Cal
     return acc;
   }, {} as Record<string, Attendance[]>);
 
-  // Загружаем количество комментариев при смене месяца
   useEffect(() => {
     fetchCommentCounts();
   }, [currentDate]);
@@ -54,27 +58,22 @@ export default function Calendar({ users, attendances, onRefresh, isAdmin }: Cal
     }
   };
 
-  const handlePrevMonth = () => {
-    setCurrentDate(subMonths(currentDate, 1));
+  const changeDate = (newDate: Date) => {
+    if (onDateChange) {
+      onDateChange(newDate);
+    } else {
+      setInternalDate(newDate);
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(addMonths(currentDate, 1));
-  };
-
-  const handleDayClick = (date: Date) => {
-    setSelectedDate(date);
-  };
-
+  const handlePrevMonth = () => changeDate(subMonths(currentDate, 1));
+  const handleNextMonth = () => changeDate(addMonths(currentDate, 1));
+  const handleDayClick = (date: Date) => setSelectedDate(date);
   const handleCloseModal = () => {
     setSelectedDate(null);
-    // Обновляем количество комментариев после закрытия модалки
     fetchCommentCounts();
   };
-
-  const toggleView = () => {
-    setViewMode(viewMode === 'month' ? 'year' : 'month');
-  };
+  const toggleView = () => setViewMode(viewMode === 'month' ? 'year' : 'month');
 
   if (viewMode === 'year') {
     return (
@@ -82,7 +81,7 @@ export default function Calendar({ users, attendances, onRefresh, isAdmin }: Cal
         currentDate={currentDate}
         onBack={() => setViewMode('month')}
         onMonthClick={(date) => {
-          setCurrentDate(date);
+          changeDate(date);
           setViewMode('month');
         }}
       />
@@ -90,92 +89,117 @@ export default function Calendar({ users, attendances, onRefresh, isAdmin }: Cal
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg">
+      {/* Header row */}
+      <div className="flex items-center gap-3 p-4 flex-wrap">
+        {/* Навигация по месяцам */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handlePrevMonth}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
-            <IoChevronBack className="w-6 h-6 text-gray-700 dark:text-gray-300 dark:text-gray-300" />
+            <IoChevronBack className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white dark:text-white min-w-[200px] text-center">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white min-w-[150px] text-center capitalize">
             {formatDate(currentDate, 'LLLL yyyy')}
           </h2>
           <button
             onClick={handleNextMonth}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 rounded-full transition-colors"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
-            <IoChevronForward className="w-6 h-6 text-gray-700 dark:text-gray-300 dark:text-gray-300" />
+            <IoChevronForward className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           </button>
         </div>
-        <button
-          onClick={toggleView}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-        >
-          Год
-        </button>
+
+        {/* Легенда статусов — всегда видна */}
+        <div className="flex items-center gap-2 px-2 shrink-0">
+          {[
+            { color: 'bg-office', label: 'В офисе' },
+            { color: 'bg-remote', label: 'Из дома' },
+            { color: 'bg-sick', label: 'Больничный' },
+            { color: 'bg-vacation', label: 'Отпуск' },
+            { color: 'bg-dayoff', label: 'Отгул' },
+            { color: 'bg-weekend', label: 'Выходной' },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-1">
+              <div className={`w-2.5 h-2.5 rounded-full ${item.color}`}></div>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Toolbar: поиск, фильтры, действия — передаётся из page */}
+        {toolbar && (
+          <div className="flex-1 flex items-center justify-end gap-2">
+            {toolbar}
+          </div>
+        )}
+
+        {/* Год, Свернуть */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={toggleView}
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+          >
+            Год
+          </button>
+
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title={collapsed ? 'Развернуть' : 'Свернуть'}
+          >
+            {collapsed ? <IoChevronDown className="w-5 h-5" /> : <IoChevronUp className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-900 dark:bg-gray-900 rounded-lg">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-office border-2 border-office"></div>
-          <span className="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">В офисе</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-remote border-2 border-remote"></div>
-          <span className="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">Из дома</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-sick border-2 border-sick"></div>
-          <span className="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">Больничный</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-vacation border-2 border-vacation"></div>
-          <span className="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">Отпуск</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-dayoff border-2 border-dayoff"></div>
-          <span className="text-sm text-gray-700 dark:text-gray-300 dark:text-gray-300">Отгул</span>
-        </div>
-      </div>
+      {/* Раскрывающаяся панель фильтров (под шапкой, над сеткой) */}
+      {filterPanel}
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
-        {/* Week days header */}
-        {weekDays.map((day) => (
-          <div
-            key={day}
-            className="bg-gray-50 dark:bg-gray-900 p-3 text-center font-semibold text-gray-700 dark:text-gray-300 dark:text-gray-300 text-sm"
-          >
-            {day}
+      {!collapsed && (
+        <div className="px-4 pb-4">
+          <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden">
+            {weekDays.map((day) => (
+              <div
+                key={day}
+                className="bg-gray-50 dark:bg-gray-900 p-2 text-center font-semibold text-gray-600 dark:text-gray-400 text-xs"
+              >
+                {day}
+              </div>
+            ))}
+
+            {days.map((day) => {
+              const dateKey = dateToString(day);
+              const dayAttendances = attendanceByDate[dateKey] || [];
+              const commentsCount = commentCounts[dateKey] || 0;
+
+              return (
+                <DayCell
+                  key={day.toISOString()}
+                  date={day}
+                  isCurrentMonth={isCurrentMonth(day, currentDate)}
+                  isToday={isToday(day)}
+                  users={users}
+                  attendances={dayAttendances}
+                  onClick={() => handleDayClick(day)}
+                  commentsCount={commentsCount}
+                />
+              );
+            })}
           </div>
-        ))}
+        </div>
+      )}
 
-        {/* Days */}
-        {days.map((day) => {
-          const dateKey = dateToString(day);
-          const dayAttendances = attendanceByDate[dateKey] || [];
-          const commentsCount = commentCounts[dateKey] || 0;
-          
-          return (
-            <DayCell
-              key={day.toISOString()}
-              date={day}
-              isCurrentMonth={isCurrentMonth(day, currentDate)}
-              isToday={isToday(day)}
-              users={users}
-              attendances={dayAttendances}
-              onClick={() => handleDayClick(day)}
-              commentsCount={commentsCount}
-            />
-          );
-        })}
-      </div>
+      {collapsed && (
+        <div className="px-4 pb-3">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
+            Календарь свёрнут · {users.length} сотр. · {attendances.length} записей
+          </p>
+        </div>
+      )}
 
-      {/* Day Details Modal */}
       {selectedDate && (
         <DayDetailsModalEnhanced
           isOpen={!!selectedDate}

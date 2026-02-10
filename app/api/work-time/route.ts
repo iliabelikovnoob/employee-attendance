@@ -142,12 +142,42 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Must check in first' }, { status: 400 });
       }
 
+      // Автоматически завершаем активный перерыв при check-out
+      const activeBreaks = await prisma.workBreak.findMany({
+        where: {
+          workTimeId: workTime.id,
+          endTime: null,
+        },
+      });
+
+      for (const ab of activeBreaks) {
+        const breakDur = differenceInMinutes(now, ab.startTime);
+        await prisma.workBreak.update({
+          where: { id: ab.id },
+          data: { endTime: now, duration: breakDur },
+        });
+      }
+
+      // Считаем общее время перерывов
+      const allBreaks = await prisma.workBreak.findMany({
+        where: {
+          workTimeId: workTime.id,
+          endTime: { not: null },
+        },
+      });
+
+      const totalBreakMinutes = allBreaks.reduce((sum, b) => sum + b.duration, 0);
+      const breakTimeHours = parseFloat((totalBreakMinutes / 60).toFixed(2));
+
       // Вычисляем отработанные часы
       const totalMinutes = differenceInMinutes(now, workTime.checkIn);
       const totalHours = parseFloat((totalMinutes / 60).toFixed(2));
-      
-      // Сверхурочные (больше 8 часов)
-      const overtime = Math.max(0, totalHours - 8);
+
+      // Чистое рабочее время = общее - перерывы
+      const netHours = parseFloat(Math.max(0, totalHours - breakTimeHours).toFixed(2));
+
+      // Сверхурочные считаем от чистого рабочего времени (больше 8 часов)
+      const overtime = Math.max(0, netHours - 8);
 
       workTime = await prisma.workTime.update({
         where: {
@@ -159,6 +189,8 @@ export async function POST(request: NextRequest) {
         data: {
           checkOut: now,
           totalHours,
+          breakTime: breakTimeHours,
+          netHours,
           overtime,
           notes: notes || workTime.notes,
         },

@@ -196,18 +196,38 @@ model WorkTime {
   date        DateTime    // Дата
   checkIn     DateTime?   // Время прихода
   checkOut    DateTime?   // Время ухода
-  totalHours  Float       @default(0) // Всего часов
-  overtime    Float       @default(0) // Сверхурочные часы
+  totalHours  Float       @default(0) // Всего часов (общее время)
+  breakTime   Float       @default(0) // Время перерывов в часах
+  netHours    Float       @default(0) // Чистое рабочее время (totalHours - breakTime)
+  overtime    Float       @default(0) // Сверхурочные часы (на основе netHours)
   notes       String?     // Примечания
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
-  
+
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  breaks      WorkBreak[]
+
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
   @@map("work_times")
+}
+
+model WorkBreak {
+  id          String      @id @default(cuid())
+  workTimeId  String
+  startTime   DateTime    // Начало перерыва
+  endTime     DateTime?   // Конец перерыва (null = ещё на перерыве)
+  duration    Float       @default(0) // Длительность в минутах
+  type        String      @default("BREAK") // BREAK | LUNCH | OTHER
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  workTime    WorkTime    @relation(fields: [workTimeId], references: [id], onDelete: Cascade)
+
+  @@index([workTimeId])
+  @@index([startTime])
+  @@map("work_breaks")
 }
 
 model OvertimeWork {
