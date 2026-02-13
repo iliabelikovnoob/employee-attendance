@@ -4,11 +4,12 @@ import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { IoPeople, IoCalendar, IoLogOut, IoDocumentText, IoStatsChart, IoSync, IoAirplane, IoMedkit, IoTime, IoMoon, IoChevronDown, IoSunny } from 'react-icons/io5';
+import { IoPeople, IoCalendar, IoLogOut, IoDocumentText, IoStatsChart, IoSync, IoAirplane, IoMedkit, IoTime, IoMoon, IoChevronDown, IoSunny, IoGrid, IoAnalytics, IoBarChart, IoBookOutline, IoFolderOutline, IoSearchOutline, IoPricetagOutline } from 'react-icons/io5';
 import clsx from 'clsx';
 import { useTheme } from '@/contexts/ThemeContext';
 import WorkTimeWidget from '@/components/work-time/WorkTimeWidget';
 import WorkTimeHistoryModal from '@/components/modals/WorkTimeHistoryModal';
+import GlobalSearchModal from '@/components/kb/GlobalSearchModal';
 
 interface HeaderProps {
   user: any;
@@ -20,6 +21,7 @@ export default function Header({ user }: HeaderProps) {
   const [pendingCount, setPendingCount] = useState(0);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showWorkTimeHistory, setShowWorkTimeHistory] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +39,19 @@ export default function Header({ user }: HeaderProps) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+K (Mac) or Ctrl+K (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSearchModal(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const fetchPendingCount = async () => {
@@ -101,8 +116,8 @@ export default function Header({ user }: HeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              Attendance System
+            <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              Система Учёта
             </Link>
           </div>
 
@@ -222,16 +237,31 @@ export default function Header({ user }: HeaderProps) {
               )}
             </div>
 
-            {/* Аналитика */}
+            {/* База Знаний */}
+            <Link
+              href="/knowledge-base"
+              onClick={closeDropdown}
+              className={clsx(
+                'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors',
+                pathname.startsWith('/knowledge-base')
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              )}
+            >
+              <IoBookOutline className="w-5 h-5" />
+              База Знаний
+            </Link>
+
+            {/* Аналитика (для админа) */}
             {user.role === 'ADMIN' ? (
               <div className="relative">
                 <button
                   onClick={() => toggleDropdown('analytics')}
                   className={clsx(
                     'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors',
-                    isActiveInDropdown(['/statistics', '/overtime']) || openDropdown === 'analytics'
+                    isActiveInDropdown(['/admin/command-center', '/admin/planning', '/admin/analytics', '/admin/employees', '/overtime', '/admin/kb-categories', '/admin/kb-tags']) || openDropdown === 'analytics'
                       ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                      : 'text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                   )}
                 >
                   <IoStatsChart className="w-5 h-5" />
@@ -240,45 +270,108 @@ export default function Header({ user }: HeaderProps) {
                 </button>
 
                 {openDropdown === 'analytics' && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 dark:border-gray-700 py-1 z-50">
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
                     <Link
-                      href="/statistics"
+                      href="/admin/command-center"
                       onClick={closeDropdown}
                       className={clsx(
-                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
-                        pathname === '/statistics' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/command-center' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
                       )}
                     >
-                      <IoStatsChart className="w-5 h-5" />
-                      <span>Статистика</span>
+                      <IoGrid className="w-5 h-5" />
+                      <span>Командный центр</span>
+                    </Link>
+
+                    <Link
+                      href="/admin/planning"
+                      onClick={closeDropdown}
+                      className={clsx(
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/planning' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                      )}
+                    >
+                      <IoAnalytics className="w-5 h-5" />
+                      <span>Планирование</span>
+                    </Link>
+
+                    <Link
+                      href="/admin/analytics"
+                      onClick={closeDropdown}
+                      className={clsx(
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/analytics' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                      )}
+                    >
+                      <IoBarChart className="w-5 h-5" />
+                      <span>KPI отдела</span>
+                    </Link>
+
+                    <Link
+                      href="/admin/employees"
+                      onClick={closeDropdown}
+                      className={clsx(
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/employees' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                      )}
+                    >
+                      <IoPeople className="w-5 h-5" />
+                      <span>Сотрудники</span>
                     </Link>
 
                     <Link
                       href="/overtime"
                       onClick={closeDropdown}
                       className={clsx(
-                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
                         pathname === '/overtime' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
                       )}
                     >
-                      <IoMoon className="w-5 h-5" />
+                      <IoTime className="w-5 h-5" />
                       <span>Сверхурочные</span>
+                    </Link>
+
+                    <div className="border-t border-gray-100 dark:border-gray-700 my-1"></div>
+
+                    <Link
+                      href="/admin/kb-categories"
+                      onClick={closeDropdown}
+                      className={clsx(
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/kb-categories' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                      )}
+                    >
+                      <IoFolderOutline className="w-5 h-5" />
+                      <span>Категории БЗ</span>
+                    </Link>
+
+                    <Link
+                      href="/admin/kb-tags"
+                      onClick={closeDropdown}
+                      className={clsx(
+                        'w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors',
+                        pathname === '/admin/kb-tags' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white dark:text-gray-100'
+                      )}
+                    >
+                      <IoPricetagOutline className="w-5 h-5" />
+                      <span>Теги БЗ</span>
                     </Link>
                   </div>
                 )}
               </div>
             ) : (
               <Link
-                href="/statistics"
+                href="/overtime"
+                onClick={closeDropdown}
                 className={clsx(
                   'px-4 py-2 rounded-lg flex items-center gap-2 transition-colors',
-                  pathname === '/statistics'
+                  pathname === '/overtime'
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                    : 'text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <IoStatsChart className="w-5 h-5" />
-                Статистика
+                <IoTime className="w-5 h-5" />
+                Сверхурочные
               </Link>
             )}
           </nav>
@@ -306,6 +399,20 @@ export default function Header({ user }: HeaderProps) {
 
             {/* Work Time Widget */}
             <WorkTimeWidget onOpenHistory={() => setShowWorkTimeHistory(true)} />
+
+            {/* Search Button */}
+            <button
+              onClick={() => setShowSearchModal(true)}
+              className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative group"
+              title="Поиск (Cmd+K)"
+            >
+              <IoSearchOutline className="w-5 h-5" />
+              <span className="hidden lg:inline-block ml-2 text-xs text-gray-500 dark:text-gray-400">
+                <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-xs font-mono">
+                  ⌘K
+                </kbd>
+              </span>
+            </button>
 
             {/* Theme Toggle */}
             <button
@@ -335,6 +442,12 @@ export default function Header({ user }: HeaderProps) {
       <WorkTimeHistoryModal
         isOpen={showWorkTimeHistory}
         onClose={() => setShowWorkTimeHistory(false)}
+      />
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
       />
     </header>
   );

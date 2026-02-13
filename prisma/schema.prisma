@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
 }
 
 datasource db {
@@ -56,6 +57,19 @@ enum CommentType {
   INFO         // Информационный
 }
 
+enum ArticleStatus {
+  DRAFT        // Черновик
+  PENDING      // На проверке
+  PUBLISHED    // Опубликовано
+  REJECTED     // Отклонено
+}
+
+enum ArticleContentType {
+  TEXT         // Текстовая статья (Markdown)
+  DOCX         // Загруженный Word документ
+  PDF          // Загруженный PDF документ
+}
+
 model User {
   id                String              @id @default(cuid())
   email             String              @unique
@@ -82,7 +96,14 @@ model User {
   swapRequestsInitiated ScheduleSwapRequest[] @relation("SwapRequester")
   swapRequestsReceived  ScheduleSwapRequest[] @relation("SwapTarget")
   swapRequestsReviewed  ScheduleSwapRequest[] @relation("SwapAdminReviewer")
-  
+
+  // База знаний
+  articlesAuthored      KbArticle[]           @relation("ArticleAuthor")
+  articleVersionsEdited KbArticleVersion[]    @relation("ArticleVersionEditor")
+  articleComments       KbComment[]           @relation("ArticleCommentAuthor")
+  favoriteArticles      KbFavorite[]          @relation("UserFavorites")
+  uploadedMedia         KbMedia[]             @relation("MediaUploader")
+
   @@map("users")
 }
 
@@ -295,3 +316,171 @@ model ScheduleSwapRequest {
   @@map("schedule_swap_requests")
 }
 
+// ═════════════════════════════════════════════════════════
+// БАЗА ЗНАНИЙ (Knowledge Base)
+// ═════════════════════════════════════════════════════════
+
+// Категории статей
+model KbCategory {
+  id          String       @id @default(cuid())
+  name        String
+  icon        String?      // Emoji или иконка
+  description String?      @db.Text
+  parentId    String?      // Для вложенных категорий
+  createdAt   DateTime     @default(now())
+  
+  parent      KbCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    KbCategory[] @relation("CategoryTree")
+  articles    KbArticle[]
+  
+  @@index([parentId])
+  @@map("kb_categories")
+}
+
+// Статьи
+model KbArticle {
+  id                String              @id @default(cuid())
+  title             String
+  slug              String              @unique // Для URL
+  content           String              @db.Text // Markdown контент или HTML из DOCX
+  contentType       ArticleContentType  @default(TEXT) // Тип контента
+  filePath          String?             // Путь к файлу (для DOCX/PDF)
+  fileSize          Int?                // Размер файла в байтах
+  originalFileName  String?             // Оригинальное имя файла
+  categoryId        String?
+  authorId          String
+  status            ArticleStatus       @default(DRAFT)
+  viewsCount        Int                 @default(0)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  category    KbCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author      User              @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  tags        KbArticleTag[]
+  versions    KbArticleVersion[]
+  comments    KbComment[]
+  favorites   KbFavorite[]
+  media       KbMedia[]
+  linksFrom   KbArticleLink[]   @relation("ArticleLinksFrom")
+  linksTo     KbArticleLink[]   @relation("ArticleLinksTo")
+  
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([status])
+  @@index([slug])
+  @@map("kb_articles")
+}
+
+// Теги
+model KbTag {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  createdAt   DateTime        @default(now())
+  
+  articles    KbArticleTag[]
+  
+  @@map("kb_tags")
+}
+
+// Связь статей с тегами
+model KbArticleTag {
+  articleId   String
+  tagId       String
+  
+  article     KbArticle       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag         KbTag           @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@id([articleId, tagId])
+  @@index([articleId])
+  @@index([tagId])
+  @@map("kb_article_tags")
+}
+
+// Ссылки между статьями
+model KbArticleLink {
+  sourceArticleId String
+  targetArticleId String
+  createdAt       DateTime      @default(now())
+  
+  sourceArticle   KbArticle     @relation("ArticleLinksFrom", fields: [sourceArticleId], references: [id], onDelete: Cascade)
+  targetArticle   KbArticle     @relation("ArticleLinksTo", fields: [targetArticleId], references: [id], onDelete: Cascade)
+  
+  @@id([sourceArticleId, targetArticleId])
+  @@index([sourceArticleId])
+  @@index([targetArticleId])
+  @@map("kb_article_links")
+}
+
+// История версий
+model KbArticleVersion {
+  id                String              @id @default(cuid())
+  articleId         String
+  title             String
+  content           String              @db.Text
+  contentType       ArticleContentType  @default(TEXT) // Тип контента версии
+  filePath          String?             // Путь к файлу версии (для DOCX/PDF)
+  fileSize          Int?                // Размер файла версии
+  originalFileName  String?             // Имя файла версии
+  editedBy          String
+  createdAt         DateTime            @default(now())
+
+  article           KbArticle           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  editor            User                @relation("ArticleVersionEditor", fields: [editedBy], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([editedBy])
+  @@map("kb_article_versions")
+}
+
+// Комментарии к статьям
+model KbComment {
+  id          String        @id @default(cuid())
+  articleId   String
+  userId      String
+  content     String        @db.Text
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  article     KbArticle     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user        User          @relation("ArticleCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([articleId])
+  @@index([userId])
+  @@map("kb_comments")
+}
+
+// Избранное пользователей
+model KbFavorite {
+  userId      String
+  articleId   String
+  createdAt   DateTime      @default(now())
+  
+  user        User          @relation("UserFavorites", fields: [userId], references: [id], onDelete: Cascade)
+  article     KbArticle     @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  
+  @@id([userId, articleId])
+  @@index([userId])
+  @@index([articleId])
+  @@map("kb_favorites")
+}
+
+// Медиафайлы (изображения, видео)
+model KbMedia {
+  id          String        @id @default(cuid())
+  articleId   String?       // Опционально: можно загружать файлы без привязки к статье
+  filename    String
+  url         String        // URL для доступа к файлу (/uploads/kb/...)
+  filePath    String        // Полный путь к файлу на сервере
+  fileType    String        // image, video
+  fileSize    Int           // В байтах
+  uploadedBy  String
+  createdAt   DateTime      @default(now())
+
+  article     KbArticle?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  uploader    User          @relation("MediaUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([uploadedBy])
+  @@map("kb_media")
+}
